@@ -581,6 +581,9 @@ async function drainQ() {
     src.onended = () => drainQ();
   } catch (e) { console.error('Audio error:', e); drainQ(); }
 }
+function playAudio(b64) {
+  console.log('Audio chunk recibido, tamaño:', b64.length);
+  const bin = atob(b64);
 
 // ── UI HELPERS ────────────────────────────────────────────────────────────────
 function setStatus(cls, label) {
