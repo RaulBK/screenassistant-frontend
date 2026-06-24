@@ -550,7 +550,15 @@ function floatToPCM16(f32) {
 }
 
 // ── AUDIO PLAYBACK ────────────────────────────────────────────────────────────
-let audioQ = [], playing = false;
+let audioQ = [], playing = false, sharedAudioCtx = null;
+
+function getAudioCtx() {
+  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+    sharedAudioCtx = new AudioContext({ sampleRate: 16000 });
+  }
+  if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+  return sharedAudioCtx;
+}
 
 function playAudio(b64) {
   const bin = atob(b64);
@@ -563,16 +571,15 @@ function playAudio(b64) {
 async function drainQ() {
   if (!audioQ.length) { playing = false; setBars(false); setStatus('connected','Conectado'); return; }
   playing = true;
-  const ctx = new AudioContext();
+  const ctx = getAudioCtx();
   try {
     const decoded = await ctx.decodeAudioData(audioQ.shift());
     const src = ctx.createBufferSource();
     src.buffer = decoded;
     src.connect(ctx.destination);
     src.start();
-    src.onended = () => { ctx.close(); drainQ(); };
-  } catch { ctx.close(); drainQ(); }
-}
+    src.onended = () => drainQ();
+  } catch (e) {
 
 // ── UI HELPERS ────────────────────────────────────────────────────────────────
 function setStatus(cls, label) {
