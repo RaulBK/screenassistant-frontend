@@ -579,7 +579,8 @@ async function drainQ() {
     src.connect(ctx.destination);
     src.start();
     src.onended = () => drainQ();
-  } catch (e) {
+  } catch (e) { console.error('Audio error:', e); drainQ(); }
+}
 
 // ── UI HELPERS ────────────────────────────────────────────────────────────────
 function setStatus(cls, label) {
