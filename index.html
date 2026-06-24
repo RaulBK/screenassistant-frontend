@@ -60,6 +60,14 @@
   .btn-primary:not(:disabled):hover { background: #c1121f; }
   .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-ghost:not(:disabled):hover { background: var(--border); }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text); outline: none; transition: border-color 0.15s; }
+  .chat-input:focus { border-color: var(--accent2); }
+  .chat-input::placeholder { color: var(--text-muted); opacity: 0.6; }
+  .chat-input:disabled { opacity: 0.35; }
+  .btn-send { padding: 9px 14px; border-radius: 8px; border: none; background: var(--accent2); color: white; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+  .btn-send:hover { background: #355f7a; }
+  .btn-send:disabled { opacity: 0.35; cursor: not-allowed; }
   canvas { display: none; }
 </style>
 </head>
@@ -135,6 +143,15 @@
           Colgar
         </button>
       </div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chatInput" type="text" placeholder="Escribe un mensaje..." disabled onkeydown="handleChatKey(event)" />
+        <button class="btn-send" id="btnSend" onclick="sendChatMessage()" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -148,6 +165,7 @@ var screenStream = null;
 var elevenSocket = null;
 var micAudioCtx  = null;
 var isConnected  = false;
+var playCtx      = null;
 
 // ── SCREEN SHARE ──────────────────────────────────────────────────────────────
 async function startScreenShare() {
@@ -190,7 +208,6 @@ function captureFrame() {
   var w = video.videoWidth;
   var h = video.videoHeight;
   if (!w || !h) return null;
-  // Scale down to max 1280px wide
   var maxW = 1280;
   if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
   canvas.width  = w;
@@ -198,7 +215,6 @@ function captureFrame() {
   canvas.getContext('2d').drawImage(video, 0, 0, w, h);
   var dataUrl = canvas.toDataURL('image/jpeg', 0.6);
   if (!dataUrl || dataUrl === 'data:,') return null;
-  // Flash feedback
   var flash = document.getElementById('captureFlash');
   flash.classList.add('flash');
   setTimeout(function() { flash.classList.remove('flash'); }, 150);
@@ -225,15 +241,31 @@ async function analyzeScreen(question) {
 async function manualCapture() {
   addMsg('system', 'Analizando pantalla...');
   var analysis = await analyzeScreen();
-  if (analysis) {
-    addMsg('system', analysis);
-  } else {
-    addMsg('system', 'No se pudo capturar la pantalla.');
-  }
+  if (analysis) addMsg('system', analysis);
+  else addMsg('system', 'No se pudo capturar la pantalla.');
+}
+
+// ── CHAT INPUT ────────────────────────────────────────────────────────────────
+function handleChatKey(e) {
+  if (e.key === 'Enter') sendChatMessage();
+}
+
+function sendChatMessage() {
+  var input = document.getElementById('chatInput');
+  var text = input.value.trim();
+  if (!text) return;
+  if (!elevenSocket || elevenSocket.readyState !== WebSocket.OPEN) return;
+  addMsg('user', text);
+  elevenSocket.send(JSON.stringify({ type: 'user_message', user_message: text }));
+  input.value = '';
 }
 
 // ── ELEVENLABS ────────────────────────────────────────────────────────────────
 async function connectAgent() {
+  // Desbloquear AudioContext dentro de un gesto de usuario
+  if (!playCtx || playCtx.state === 'closed') playCtx = new AudioContext();
+  if (playCtx.state === 'suspended') await playCtx.resume();
+
   document.getElementById('btnConnect').disabled = true;
   try {
     var r = await fetch(BACKEND_URL + '/api/elevenlabs/signed-url');
@@ -247,6 +279,8 @@ async function connectAgent() {
       isConnected = true;
       setStatus('connected', 'Conectado');
       document.getElementById('btnDisconnect').disabled = false;
+      document.getElementById('chatInput').disabled     = false;
+      document.getElementById('btnSend').disabled       = false;
       addMsg('system', 'Sesión activa. El asistente está escuchando.');
       startMic();
     };
@@ -296,6 +330,8 @@ async function connectAgent() {
       setStatus('', 'Desconectado');
       document.getElementById('btnConnect').disabled    = false;
       document.getElementById('btnDisconnect').disabled = true;
+      document.getElementById('chatInput').disabled     = true;
+      document.getElementById('btnSend').disabled       = true;
       setBars(false);
       stopMic();
       addMsg('system', 'Sesión finalizada.');
@@ -355,7 +391,6 @@ function floatToPCM16(f32) {
 // ── AUDIO PLAYBACK ────────────────────────────────────────────────────────────
 var audioQ  = [];
 var playing = false;
-var playCtx = null;
 
 function getPlayCtx() {
   if (!playCtx || playCtx.state === 'closed') playCtx = new AudioContext();
