@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Asistente Cambia a Bankinter</title>
+<title>Screen Assistant · Bankinter</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
@@ -74,7 +74,6 @@
   }
 
   .status-pill.speaking .status-dot { animation: blink 0.8s infinite; }
-
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
   .main {
@@ -85,7 +84,6 @@
     min-height: 0;
   }
 
-  /* ── Screen panel ── */
   .screen-panel {
     display: flex; flex-direction: column;
     border-right: 1px solid var(--border);
@@ -119,8 +117,7 @@
 
   .capture-flash {
     position: absolute; inset: 0;
-    background: white;
-    opacity: 0;
+    background: white; opacity: 0;
     pointer-events: none;
     transition: opacity 0.1s;
   }
@@ -134,7 +131,6 @@
     flex-shrink: 0;
   }
 
-  /* ── Right panel ── */
   .right-panel {
     display: flex; flex-direction: column;
     background: var(--surface);
@@ -192,7 +188,6 @@
     padding: 6px 12px;
   }
 
-  /* ── Controls ── */
   .controls {
     padding: 14px 16px;
     border-top: 1px solid var(--border);
@@ -210,7 +205,6 @@
     width: 3px; border-radius: 2px;
     background: var(--accent);
     height: 5px;
-    transition: height 0.08s;
   }
 
   .vbar.active { animation: vbar-anim 0.45s ease-in-out infinite alternate; }
@@ -237,15 +231,9 @@
   }
 
   .btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
   .btn-primary { background: var(--accent); color: white; }
   .btn-primary:not(:disabled):hover { background: #c1121f; }
-
-  .btn-ghost {
-    background: var(--surface2);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-ghost:not(:disabled):hover { background: var(--border); }
 
   canvas { display: none; }
@@ -263,7 +251,6 @@
 </header>
 
 <div class="main">
-  <!-- Screen -->
   <div class="screen-panel">
     <div class="screen-preview">
       <video id="screenVideo" autoplay muted playsinline></video>
@@ -299,7 +286,6 @@
     </div>
   </div>
 
-  <!-- Conversation + controls -->
   <div class="right-panel">
     <div class="conversation" id="conversation">
       <div class="msg system">
@@ -333,15 +319,12 @@
 <canvas id="captureCanvas"></canvas>
 
 <script>
-// ── CONFIG ────────────────────────────────────────────────────────────────────
-// Set this to your Railway backend URL (no trailing slash)
-const BACKEND_URL = window.BACKEND_URL || 'https://screenassistant-backend-production.up.railway.app';
+const BACKEND_URL = 'https://screenassistant-backend-production.up.railway.app';
 
-// ── STATE ─────────────────────────────────────────────────────────────────────
-let screenStream  = null;
-let elevenSocket  = null;
-let audioCtx      = null;
-let isConnected   = false;
+let screenStream = null;
+let elevenSocket = null;
+let micAudioCtx  = null;
+let isConnected  = false;
 
 // ── SCREEN SHARE ──────────────────────────────────────────────────────────────
 async function startScreenShare() {
@@ -365,9 +348,9 @@ async function startScreenShare() {
 }
 
 function stopScreenShare() {
-  screenStream?.getTracks().forEach(t => t.stop());
+  screenStream && screenStream.getTracks().forEach(function(t) { t.stop(); });
   screenStream = null;
-  const video = document.getElementById('screenVideo');
+  var video = document.getElementById('screenVideo');
   video.srcObject = null;
   video.style.display = 'none';
   document.getElementById('screenPlaceholder').style.display = '';
@@ -379,31 +362,27 @@ function stopScreenShare() {
 // ── CAPTURE + VISION ──────────────────────────────────────────────────────────
 function captureFrame() {
   if (!screenStream) return null;
-  const video  = document.getElementById('screenVideo');
-  const canvas = document.getElementById('captureCanvas');
+  var video  = document.getElementById('screenVideo');
+  var canvas = document.getElementById('captureCanvas');
   canvas.width  = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-
-  // Flash feedback
-  const flash = document.getElementById('captureFlash');
+  var flash = document.getElementById('captureFlash');
   flash.classList.add('flash');
-  setTimeout(() => flash.classList.remove('flash'), 150);
-
+  setTimeout(function() { flash.classList.remove('flash'); }, 150);
   return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
 }
 
 async function analyzeScreen(question) {
-  const image = captureFrame();
+  var image = captureFrame();
   if (!image) return null;
-
   try {
-    const r = await fetch(`${BACKEND_URL}/api/vision/analyze`, {
+    var r = await fetch(BACKEND_URL + '/api/vision/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image, question })
+      body: JSON.stringify({ image: image, question: question })
     });
-    const data = await r.json();
+    var data = await r.json();
     return data.analysis || null;
   } catch (e) {
     console.error('Vision error:', e);
@@ -412,15 +391,14 @@ async function analyzeScreen(question) {
 }
 
 async function manualCapture() {
-  addMsg('system', '📸 Analizando pantalla...');
-  const analysis = await analyzeScreen();
+  addMsg('system', 'Analizando pantalla...');
+  var analysis = await analyzeScreen();
   if (analysis) {
-    addMsg('system', `👁 ${analysis}`);
-    // If agent is connected, inject as context
-    if (elevenSocket?.readyState === WebSocket.OPEN) {
+    addMsg('system', analysis);
+    if (elevenSocket && elevenSocket.readyState === WebSocket.OPEN) {
       elevenSocket.send(JSON.stringify({
         type: 'user_message',
-        user_message: `[Pantalla actual del gestor: ${analysis}]`
+        user_message: '[Pantalla actual del gestor: ' + analysis + ']'
       }));
     }
   }
@@ -429,15 +407,15 @@ async function manualCapture() {
 // ── ELEVENLABS ────────────────────────────────────────────────────────────────
 async function connectAgent() {
   document.getElementById('btnConnect').disabled = true;
-
   try {
-    const r = await fetch(`${BACKEND_URL}/api/elevenlabs/signed-url`);
-    if (!r.ok) throw new Error('No se pudo obtener la URL del agente. Verifica el backend.');
-    const { signed_url } = await r.json();
+    var r = await fetch(BACKEND_URL + '/api/elevenlabs/signed-url');
+    if (!r.ok) throw new Error('No se pudo obtener la URL del agente.');
+    var json = await r.json();
+    var signed_url = json.signed_url;
 
     elevenSocket = new WebSocket(signed_url);
 
-    elevenSocket.onopen = () => {
+    elevenSocket.onopen = function() {
       isConnected = true;
       setStatus('connected', 'Conectado');
       document.getElementById('btnDisconnect').disabled = false;
@@ -445,41 +423,30 @@ async function connectAgent() {
       startMic();
     };
 
-    elevenSocket.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
+    elevenSocket.onmessage = async function(event) {
+      var data = JSON.parse(event.data);
 
-      if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
-        const text = data.agent_response_event.agent_response;
-        addMsg('agent', text);
-        // Auto-capture if agent references the screen
-        if (screenStream && mentionsScreen(text)) {
-          const analysis = await analyzeScreen();
-          if (analysis && elevenSocket?.readyState === WebSocket.OPEN) {
-            elevenSocket.send(JSON.stringify({
-              type: 'user_message',
-              user_message: `[Pantalla actual: ${analysis}]`
-            }));
-          }
-        }
+      if (data.type === 'agent_response' && data.agent_response_event && data.agent_response_event.agent_response) {
+        addMsg('agent', data.agent_response_event.agent_response);
       }
 
-      if (data.type === 'user_transcript' && data.user_transcription_event?.user_transcript) {
+      if (data.type === 'user_transcript' && data.user_transcription_event && data.user_transcription_event.user_transcript) {
         addMsg('user', data.user_transcription_event.user_transcript);
       }
 
-      if (data.type === 'audio' && data.audio_event?.audio_base64_chunk) {
+      if (data.type === 'audio' && data.audio_event && data.audio_event.audio_base64_chunk) {
         playAudio(data.audio_event.audio_base64_chunk);
         setStatus('speaking', 'Hablando');
         setBars(true);
       }
 
-      if (['agent_response_correction','interruption','ping'].includes(data.type)) {
+      if (data.type === 'agent_response_correction' || data.type === 'interruption' || data.type === 'ping') {
         setStatus('connected', 'Conectado');
         setBars(false);
       }
     };
 
-    elevenSocket.onclose = () => {
+    elevenSocket.onclose = function() {
       isConnected = false;
       setStatus('', 'Desconectado');
       document.getElementById('btnConnect').disabled    = false;
@@ -489,7 +456,7 @@ async function connectAgent() {
       addMsg('system', 'Sesión finalizada.');
     };
 
-    elevenSocket.onerror = () => {
+    elevenSocket.onerror = function() {
       addMsg('system', 'Error en la conexión con el agente.');
       document.getElementById('btnConnect').disabled = false;
     };
@@ -501,116 +468,118 @@ async function connectAgent() {
 }
 
 function disconnectAgent() {
-  elevenSocket?.close();
-}
-
-function mentionsScreen(text) {
-  const kw = ['pantalla','ves','veo','muéstrame','captura','screenshot','qué aparece','qué tienes','dónde estás','donde estás'];
-  const t = text.toLowerCase();
-  return kw.some(k => t.includes(k));
+  if (elevenSocket) elevenSocket.close();
 }
 
 // ── MICROPHONE ────────────────────────────────────────────────────────────────
-let micProcessor = null;
-
 async function startMic() {
   try {
-    audioCtx = new AudioContext({ sampleRate: 16000 });
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const src = audioCtx.createMediaStreamSource(stream);
-    micProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
+    micAudioCtx = new AudioContext({ sampleRate: 16000 });
+    var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    var src = micAudioCtx.createMediaStreamSource(stream);
+    var processor = micAudioCtx.createScriptProcessor(4096, 1, 1);
 
-    micProcessor.onaudioprocess = (e) => {
-      if (!isConnected || elevenSocket?.readyState !== WebSocket.OPEN) return;
-      const pcm = floatToPCM16(e.inputBuffer.getChannelData(0));
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm.buffer)));
+    processor.onaudioprocess = function(e) {
+      if (!isConnected || !elevenSocket || elevenSocket.readyState !== WebSocket.OPEN) return;
+      var pcm = floatToPCM16(e.inputBuffer.getChannelData(0));
+      var bytes = new Uint8Array(pcm.buffer);
+      var binary = '';
+      for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      var b64 = btoa(binary);
       elevenSocket.send(JSON.stringify({ user_audio_chunk: b64 }));
     };
 
-    src.connect(micProcessor);
-    micProcessor.connect(audioCtx.destination);
+    src.connect(processor);
+    processor.connect(micAudioCtx.destination);
   } catch (e) {
     addMsg('system', 'Sin acceso al micrófono: ' + e.message);
   }
 }
 
 function stopMic() {
-  audioCtx?.close();
-  audioCtx = null;
+  if (micAudioCtx) { micAudioCtx.close(); micAudioCtx = null; }
 }
 
 function floatToPCM16(f32) {
-  const buf  = new ArrayBuffer(f32.length * 2);
-  const view = new DataView(buf);
-  for (let i = 0; i < f32.length; i++) {
-    const s = Math.max(-1, Math.min(1, f32[i]));
+  var buf  = new ArrayBuffer(f32.length * 2);
+  var view = new DataView(buf);
+  for (var i = 0; i < f32.length; i++) {
+    var s = Math.max(-1, Math.min(1, f32[i]));
     view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
   }
   return view;
 }
 
 // ── AUDIO PLAYBACK ────────────────────────────────────────────────────────────
-let audioQ = [], playing = false, sharedAudioCtx = null;
+var audioQ   = [];
+var playing  = false;
+var playCtx  = null;
 
-function getAudioCtx() {
-  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-    sharedAudioCtx = new AudioContext({ sampleRate: 16000 });
+function getPlayCtx() {
+  if (!playCtx || playCtx.state === 'closed') {
+    playCtx = new AudioContext();
   }
-  if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
-  return sharedAudioCtx;
+  if (playCtx.state === 'suspended') playCtx.resume();
+  return playCtx;
 }
 
 function playAudio(b64) {
-  const bin = atob(b64);
-  const buf = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  audioQ.push(buf.buffer);
+  var bin = atob(b64);
+  var buf = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  audioQ.push(buf.buffer.slice(0));
   if (!playing) drainQ();
 }
 
-async function drainQ() {
-  if (!audioQ.length) { playing = false; setBars(false); setStatus('connected','Conectado'); return; }
+function drainQ() {
+  if (!audioQ.length) {
+    playing = false;
+    setBars(false);
+    setStatus('connected', 'Conectado');
+    return;
+  }
   playing = true;
-  const ctx = getAudioCtx();
-  try {
-    const decoded = await ctx.decodeAudioData(audioQ.shift());
-    const src = ctx.createBufferSource();
+  var ctx = getPlayCtx();
+  var chunk = audioQ.shift();
+  ctx.decodeAudioData(chunk, function(decoded) {
+    var src = ctx.createBufferSource();
     src.buffer = decoded;
     src.connect(ctx.destination);
     src.start();
-    src.onended = () => drainQ();
-  } catch (e) { console.error('Audio error:', e); drainQ(); }
+    src.onended = drainQ;
+  }, function(err) {
+    console.error('Decode error:', err);
+    drainQ();
+  });
 }
-function playAudio(b64) {
-  console.log('Audio chunk recibido, tamaño:', b64.length);
-  const bin = atob(b64);
 
 // ── UI HELPERS ────────────────────────────────────────────────────────────────
 function setStatus(cls, label) {
-  const pill = document.getElementById('statusPill');
-  pill.className = 'status-pill ' + cls;
+  document.getElementById('statusPill').className = 'status-pill ' + cls;
   document.getElementById('statusText').textContent = label;
 }
 
 function setBars(active) {
-  for (let i = 1; i <= 5; i++) {
-    document.getElementById('vb' + i).classList.toggle('active', active);
+  for (var i = 1; i <= 5; i++) {
+    var bar = document.getElementById('vb' + i);
+    if (active) bar.classList.add('active');
+    else bar.classList.remove('active');
   }
 }
 
 function addMsg(type, text) {
-  const conv = document.getElementById('conversation');
-  const wrap = document.createElement('div');
-  wrap.className = `msg ${type}`;
+  var conv = document.getElementById('conversation');
+  var wrap = document.createElement('div');
+  wrap.className = 'msg ' + type;
 
   if (type !== 'system') {
-    const lbl = document.createElement('div');
+    var lbl = document.createElement('div');
     lbl.className = 'msg-label';
     lbl.textContent = type === 'agent' ? 'Asistente' : 'Gestor';
     wrap.appendChild(lbl);
   }
 
-  const bubble = document.createElement('div');
+  var bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
   bubble.textContent = text;
   wrap.appendChild(bubble);
