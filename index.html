@@ -370,7 +370,9 @@ function captureFrame() {
   var flash = document.getElementById('captureFlash');
   flash.classList.add('flash');
   setTimeout(function() { flash.classList.remove('flash'); }, 150);
-  return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+  canvas.width  = Math.min(video.videoWidth, 1280);
+	canvas.height = Math.min(video.videoHeight, 720);
+	return canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
 }
 
 async function analyzeScreen(question) {
@@ -457,11 +459,12 @@ async function connectAgent() {
 
         // Return result to ElevenLabs so the agent can use it
         if (elevenSocket && elevenSocket.readyState === WebSocket.OPEN) {
-          elevenSocket.send(JSON.stringify({
-            type: 'client_tool_result',
-            tool_call_id: toolCallId,
-            result: result
-          }));
+		   elevenSocket.send(JSON.stringify({
+		  type: 'client_tool_result',
+		  tool_call_id: toolCallId,
+		  result: result,
+		  is_error: false
+		}));
         }
       }
     };
