@@ -444,6 +444,26 @@ async function connectAgent() {
         setStatus('connected', 'Conectado');
         setBars(false);
       }
+
+      // ── CLIENT TOOL: analyze_screen ────────────────────────────────────────
+      if (data.type === 'client_tool_call' && data.client_tool_call && data.client_tool_call.tool_name === 'analyze_screen') {
+        var toolCallId = data.client_tool_call.tool_call_id;
+        addMsg('system', 'Analizando pantalla...');
+
+        var analysis = await analyzeScreen();
+        var result = analysis || 'No hay pantalla compartida. Pide al gestor que comparta su pantalla.';
+
+        addMsg('system', result);
+
+        // Return result to ElevenLabs so the agent can use it
+        if (elevenSocket && elevenSocket.readyState === WebSocket.OPEN) {
+          elevenSocket.send(JSON.stringify({
+            type: 'client_tool_result',
+            tool_call_id: toolCallId,
+            result: result
+          }));
+        }
+      }
     };
 
     elevenSocket.onclose = function() {
